@@ -1,0 +1,173 @@
+Photometry catalog
+------------------
+
+The catalog collect data from the SAO 3BS survey.
+It consist of 3 tables: photorun, runset and photoobj.
+Usually, stars in the 3BS survey are observed in runs. 
+Each run is assigned a unique number and is stored in the "photorun" table.
+Each run combines observation of the same sky field in different filters.
+The observed frames are joined to a specific run in the "runset" table.
+The stellar photometry obtained in each frame is stored in the "photoobj" table.
+The information about frames are stored in the "frame" table.
+It keeps useful information about the FITS files in the 3BS FITS archive
+As well it provides crossidentification between stars found in the different fields.
+The catalog also contains an auxiliary table "band", which describes the used filters.
+
+The views "photoobjframe" and "photoinfo" combine information from different tables
+for visualisation and web-interface.
+
+
+Known issue: there is no crossidentification of objects from the different fields!
+
+
+
+Table "public.frame"
+ Column  |            Type             | Description
+---------+-----------------------------+-----------+----------+--------------+--------------------------------------------
+ frameid | character varying           | Frame file name
+ dateobs | timestamp without time zone | Start of the exposure in UTC
+ band    | character varying           | Filter used for observation (see band)
+ exptime | real                        | Exposure time (sec)
+ mjd     | double precision            | Date of observation in MJD (in UTC system)
+ ra      | double precision            | Approximate RA center of the CCD (deg)
+ dec     | double precision            | Approximate Dec center of this CCD (deg)
+ header  | json                        | FITS header
+
+The "band" column references the "band" column in the "band" table
+The "frameid" column is referenced by the "photoobj" and "runset" tables.
+
+
+
+Table "public.photorun"
+   Column    |       Type        | Description
+-------------+-------------------+----------------------------------------------
+ runid       | integer           | Internal run number (automatically generated)
+ description | character varying | Description of the run
+
+The "runid" is the internal unique number of the run.
+It is referenced by "photoobj" and "runset" tables.
+
+
+
+Table "public.runset"
+ Column  |       Type        | Description
+---------+-------------------+-----------------------------------
+ runid   | integer           | Internal run number (see photorun)
+ frameid | character varying | Frame file name (see frame)
+
+It likns together the run and the frames observed inside of the run.
+The "runid" column references by the "photorun" table.
+The "frameid" column references by the "frame" table.
+The pair ("runid", "frameid") is used by the "photoobj" table.
+
+
+
+Table "public.photoobj"
+  Column  |       Type        | Description
+----------+-------------------+---------------------------------------------------------------------
+ photoid  | integer           | Internal photometry catalog number (automatically generated)
+ runid    | integer           | Internal run number (see photorun)
+ frameid  | character varying | Frame file name (see frame)
+ runobjid | character varying | The object id in the photometry run (from the photometry table)
+ x        | real              | X coordinate of the object in the frame (from the photometry table)
+ y        | real              | Y coordinate of the object in the frame (from the photometry table)
+ ra       | double precision  | RA of the object (deg) (from the photometry table)
+ dec      | double precision  | Dec of the object (deg) (from the photometry table)
+ mag      | real              | Magnitude (from the photometry table)
+ e_mag    | real              | Magnitude error (from the photometry table)
+ quality  | smallint          | Quality flag of the photometry (from the photometry table)
+
+The "photoid" is an unique identificator of the object in the specific run "runid" and frame "frameid".
+The "runobjid" is an unqie identificator of the object in given run "runid". 
+Inside the run, the same star has the same number for different frames, but it is unique only inside the run.
+
+The "frameid" column references the "frame" table.
+The "runid" column references the "photorun" table.
+The pair ("runid", "frameid") references the "runset" table.
+The table is referenced by the "objcrossid" table for the crossidentification.
+
+
+
+Table "public.objcrossid"
+ Column  |  Type   | Description
+---------+---------+----------------------------------------------------------------
+ objid   | integer | Internal catalog object number (see star)
+ photoid | integer | Internal photometric catalog object number (see photoobj)
+
+The "objid" column is referenced by the "star" table.
+The "photoid" column is referenced by the "photoobj" table.
+
+
+
+Table "public.band"
+   Column    |       Type        | Description
+-------------+-------------------+-----------+----------+--------------+
+ band        | character varying | Bandpass name
+ cwl         | real              | The central wavelength of the band (nm)
+ e_cwl       | real              | Error on cwl
+ fwhm        | real              | FWHM of the band (nm)
+ e_fwhm      | real              | Error on fwhm
+ description | character varying | Band description
+ bibcode     | character(19)     | ADS bibcode (see biblio)
+
+The "bibcode" column references the "bibcode" column in the "biblio" table.
+The "band" column is referenced by the "frame" table.
+
+
+
+View "public.photoobjframe"
+  Column  |            Type             
+----------+-----------------------------
+ photoid  | integer                     
+ runid    | integer                     
+ frameid  | character varying           
+ runobjid | character varying           
+ x        | real                        
+ y        | real                        
+ ra       | double precision            
+ dec      | double precision            
+ mag      | real                        
+ e_mag    | real                        
+ quality  | smallint                    
+ dateobs  | timestamp without time zone 
+ band     | character varying           
+ exptime  | real                        
+ mjd      | double precision            
+
+
+
+View "public.photoinfo"
+  Column   |       Type        | Description
+-----------+-------------------+-----------+----------+--------------------------------------------------------
+ runid     | integer           | Internal run number (see photorun)
+ runobjid  | character varying | The object number in the photometry run (see photoobj)
+ x         | real              | X coordinate of the object in the frame (see photoobj)
+ y         | real              | Y coordinate of the object in the frame (see photoobj)
+ ra        | double precision  | Right Ascension at epoch J2000 (see coord)
+ dec       | double precision  | Declination at epoch J2000 (see coord)
+ frameid1  | character varying | Frame file name (see frame)
+ frameid2  | character varying | Frame file name (see frame)
+ frameid3  | character varying | Frame file name (see frame)
+ band1     | character varying | Filter used for observation (see band)
+ band2     | character varying | Filter used for observation (see band)
+ band3     | character varying | Filter used for observation (see band)
+ mag1      | real              | Magnitude (see photoobj)
+ e_mag1    | real              | Magnitude error (see photoobj)
+ mag2      | real              | Magnitude (see photoobj)
+ e_mag2    | real              | Magnitude error (see photoobj)
+ mag3      | real              | Magnitude (see photoobj)
+ e_mag3    | real              | Magnitude error (see photoobj)
+ color12   | real              | Color index for 1 & 2 bands
+ e_color12 | double precision  | Color index error
+ color23   | real              | Color index for 2 & 3 bands
+ e_color23 | double precision  | Color index error
+ color13   | real              | Color index for 1 & 3 bands
+ e_color13 | double precision  | Color index error
+ quality1  | smallint          | Quality flag
+ quality2  | smallint          | Quality flag
+ quality3  | smallint          | Quality flag
+
+
+
+---------------------
+Makarov D. 28.03.2020

@@ -1,0 +1,76 @@
+Star catalog
+------------
+
+It keeps information about stars found during the 3BS survey and from other catalogs.
+The catalog consists of several tables and a view for visualisation of the information.
+
+IT IS NOT IMPLEMENTED YET IN THE DATABASE !
+
+
+Table "public.star"
+ Column |  Type   | Description
+--------+---------+--------------------------------------------------------------
+ objid  | integer | Internal catalog object number (automatically generated).
+
+It is referenced by "coord", "designation", "objcrossid", "star_principal" tables.
+
+
+
+Table "public.designation"
+ Column  |       Type        | Description
+---------+-------------------+------------------------------------------
+ objid   | integer           | Internal catalog object number (see star)
+ design  | character varying | Designation
+ bibcode | character(19)     | ADS bibcode (see biblio)
+
+The "bibcode" column references the "bibcode" column in the "biblio" table.
+The "objid" column references the "objid" column in the "star" table.
+The pair ("objid", "design") is referenced by "star_principal" table
+
+
+
+Table "public.coord"
+ Column  |       Type       | Description
+---------+------------------+---------------------------------------------------------
+ cooid   | integer          | Internal coordinate number (automatically generated)
+ objid   | integer          | Internal catalog object number (see star)
+ ra      | double precision | Right ascension at epoch J2000 (deg)
+ dec     | double precision | Declination at epoch J2000 (deg)
+ e_ra    | double precision | Error of the Right ascension at epoch J2000 (deg) [0,360)
+ e_dec   | double precision | Error of the Declination at epoch J2000 (deg) [-90,-90]
+ bibcode | character(19)    |
+
+The column "bibcode" references the "bibcode" column in the "biblio" table.
+The column "objid" references the "objid" in the "star" table.
+The primary key "cooid" is referenced by the "star_principal" table.
+
+
+
+Table "public.star_principal"
+ Column |       Type        | Description
+--------+-------------------+------------------------------------------
+ objid  | integer           | Internal catalog object number (see star)
+ design | character varying | Principal Designation (see designation)
+ cooid  | integer           | Principal coordinate number (see coord)
+
+It links an object with its designations and corresponding coordinates.
+Thus, the "objid" column references the same column in the "star" table; 
+  the pair ("objid", "design") references the same pair in the "designation" table;
+  the "cooid" points out to the "coord" table.
+
+
+
+View "public.starinfo"
+ Column |       Type        | Description
+--------+-------------------+------------------------------------------------------
+ objid  | integer           | Internal catalog object number (see star)
+ design | character varying | Principal Designation (see designation)
+ ra     | double precision  | Principal Right Ascension at epoch J2000 (see coord)
+ dec    | double precision  | Principal Declination at epoch J2000 (see coord)
+
+It combines together the information from different tables.
+
+
+
+---------------------
+Makarov D. 28.03.2020

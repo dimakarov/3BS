@@ -24,20 +24,45 @@ GRANT SELECT ON starinfo TO PUBLIC ;
 
 
 ------------- Colors view ----------------
+CREATE OR REPLACE VIEW photoObjFrame AS
+SELECT
+  p1.photoid  
+, p1.runid    
+, p1.frameid  
+, p1.runobjid 
+, p1.x        
+, p1.y        
+, p1.ra       
+, p1.dec      
+, p1.mag      
+, p1.e_mag    
+, p1.quality  
+, f1.dateobs
+, f1.band   
+, f1.exptime
+, f1.mjd    
+FROM 
+  photoobj AS p1
+  LEFT JOIN frame AS f1 USING (frameid)
+;
+
+GRANT SELECT ON photoObjFrame TO PUBLIC ;
+
+
 CREATE OR REPLACE VIEW photoinfo AS
 SELECT
-  p1.runid
-, p1.runobjid
-, p1.x
-, p1.y
-, p1.ra
-, p1.dec
+  runid
+, runobjid
+, coalesce( p1.x, p2.x, p3.x ) AS x
+, coalesce( p1.y, p2.y, p3.y ) AS y
+, coalesce( p1.ra, p2.ra, p3.ra ) AS ra
+, coalesce( p1.dec, p2.dec, p3.dec ) AS dec
 , p1.frameid AS frameid1
 , p2.frameid AS frameid2
 , p3.frameid AS frameid3
-, f1.band    AS band1
-, f2.band    AS band2
-, f3.band    AS band3
+, p1.band    AS band1
+, p2.band    AS band2
+, p3.band    AS band3
 , p1.mag     AS mag1
 , p1.e_mag   AS e_mag1
 , p2.mag     AS mag2
@@ -54,15 +79,9 @@ SELECT
 , p2.quality AS quality2
 , p3.quality AS quality3
 FROM
-  photoobj AS p1
-  FULL OUTER JOIN photoobj AS p2 ON (p2.runid=p1.runid and p2.runobjid=p1.runobjid and p2.frameid<>p1.frameid)
-  FULL OUTER JOIN photoobj AS p3 ON (p3.runid=p1.runid and p3.runid=p2.runid and p3.runobjid=p1.runobjid and p3.runobjid=p2.runobjid and p3.frameid<>p1.frameid and p3.frameid<>p2.frameid and p1.frameid<>p2.frameid)
-  LEFT JOIN frame AS f1 ON (f1.frameid=p1.frameid)
-  LEFT JOIN frame AS f2 ON (f2.frameid=p2.frameid)
-  LEFT JOIN frame AS f3 ON (f3.frameid=p3.frameid)
-  LEFT JOIN band AS b1 ON (b1.band=f1.band)
-  LEFT JOIN band AS b2 ON (b2.band=f2.band and b2.cwl>b1.cwl)
-  LEFT JOIN band AS b3 ON (b3.band=f3.band and b3.cwl>b2.cwl)
+  (SELECT * FROM photoObjFrame WHERE band='SED470') AS p1
+  FULL JOIN (SELECT * FROM photoObjFrame WHERE band='SED540') AS p2 USING (runid,runobjid)
+  FULL JOIN (SELECT * FROM photoObjFrame WHERE band='SED656') AS p3 USING (runid,runobjid)
 ;
 
 COMMENT ON VIEW photoinfo IS 'Star photometry' ;

@@ -1,0 +1,8 @@
+The SAO Polars database consists of several catalogs:
+
+Bibliography
+Star
+Bandpass
+Photometry
+
+The script addtables2db.sh adds the photometry information into the 3BS database.

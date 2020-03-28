@@ -1,0 +1,22 @@
+Bibliography catalog
+--------------------
+
+It consists of the "biblio" table collecting information on publications.
+
+                                  
+Table "public.biblio"
+ Column  |       Type        | Description
+---------+-------------------+-----------+----------+--------------
+ bibcode | character(19)     | ADS bibcode
+ authors | character varying | List of authors in ADS format
+ title   | character varying | Title of the article
+ year    | smallint          | Year of publication
+
+The "bibcode" column is referenced by the "band", "coord" and "designation" tables.
+
+For current work we use ADS convention http://adsabs.github.io/help/actions/bibcode
+for bibcodes as "2019SAOPol..1....0G", but it does not have real representation in 
+the ADS databaase.
+
+----------------------
+Makarov D.  28.03.2020
