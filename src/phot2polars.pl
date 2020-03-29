@@ -7,12 +7,15 @@ use Pod::Usage ;
 # Help section
 my $help ;
 my $man ;
+
 # File output section
 my $outputname ;
+
 # Table processing section
 our $trim = 1 ;
 our $delimiter = ',' ;
-our $empty = 99.9900 ;
+our $empty = 99.00000 ;
+
 # FITS file
 our $fitsprefix = '../fits/' ;
 
@@ -60,14 +63,19 @@ BEGIN;
 EOB
 
 
+my $header ;
 my @fits ;
 foreach (GetFITSNames($file)) { 
-  push @fits, WriteFITSInfo( $_ ) ;
+  my $fts ;
+  ($fts,$header) = GetFITSHeader( $_ ) ;
+  WriteFITSInfo( $fts, $header ) ;
+  push @fits, $fts ;
 } ;
 
 WriteImportTable($file) ;
 close($file) ;
 
+WritePhotoRun($header);
 WriteInsertData(@fits);
 
 
@@ -159,13 +167,21 @@ sub dePrefixFITSFile{
   return $name ;
 }
 
-sub WriteFITSInfo{
+
+sub GetFITSHeader{
   my $name = shift ;
 
   my $file = GetFITSFile($name) ;
   my $fits = dePrefixFITSFile($file) ;
-  
-  my $header = `imhead $file | grep =` ;
+
+  my $header = `imhead $file | grep = | grep -v ^HISTORY | grep -v ^_` ;
+
+  return ($fits,$header) ;
+}
+
+sub WriteFITSInfo{
+  my $fits = shift ;
+  my $header = shift ;
 
   (my $dateobs) = ($header =~ /DATE-OBS= *' *([^']+) *'*?/ );
   (my $band) = ($header =~ /FILTER *= *(\d+)/ );
@@ -179,8 +195,8 @@ sub WriteFITSInfo{
   my @list = split("\n",$header) ;
   @list = map { s/^ *([A-Z0-9_-]+) *= *' *(.*?) *'.*$/"$1" : "$2"/g; $_ } @list ;               # quoted values
   @list = map { s/^ *(SIMPLE|EXTEND) *= *(.*?) *\/.*$/"$1" : "$2"/g; $_ } @list ;               #
-  @list = map { s/^ *([A-Z0-9_-]+) *= *([+-]?\d+(\.\d+([eE][+-]?\d+)?)?) *\/.*$/"$1" : $2/g; $_ } @list ;      # numbers
-  @list = map { s/^ *([A-Z0-9_-]+) *= *([+-]?\d+)\. *\/.*$/"$1" : $2/g; $_ } @list ;            # numbers as 300.
+  @list = map { s/^ *([A-Z0-9_-]+) *= *([+-]?\d+(\.\d+([eE][+-]?\d+)?)?) *(\/.*)?$/"$1" : $2/g; $_ } @list ;      # numbers
+  @list = map { s/^ *([A-Z0-9_-]+) *= *([+-]?\d+)\. *(\/.*)?$/"$1" : $2/g; $_ } @list ;            # numbers as 300.
   
   $header = join("\n, ",@list) ;
   
@@ -193,9 +209,48 @@ VALUES
 ) ;
 
 EOB
-  
-  return $fits ;
 };
+
+
+sub WritePhotoRun{
+  my $header = shift ;
+
+  (my $objname) = ($header =~ /OBJECT *= *' *([^']+)/ );
+  (my $dateobs) = ($header =~ /DATE-OBS= *' *([^']+)/ );
+  (my $author)  = ($header =~ /AUTHOR *= *' *([^']+)/ );
+  (my $program) = ($header =~ /PROGRAM *= *' *([^']+)/ );
+  (my $tel)     = ($header =~ /TELESCOP *= *' *([^']+)/ );
+  (my $observ)  = ($header =~ /OBSERVAT *= *' *([^']+)/ );
+
+  $objname =~ s/\s+$// ;
+  $objname = '"'.$objname.'" was observed' if $objname ;
+  $objname = 'Observations' if !$objname ;
+
+  $author =~ s/\s+$// ;
+  $author = ' by '.$author if $author;
+
+  $dateobs = ' on '.$dateobs if $dateobs ;
+
+  $program =~ s/\s+$// ; 
+  $program = ' in framework of the program "'.$program.'"' if $program ;
+
+  $tel =~ s/\s+$// ;
+  $tel = ' on '.$tel if $tel ;
+
+  $observ =~ s/\s+$// ;
+  $observ = 'the '.$observ if $observ && $observ!~'^ *the' ;
+  $observ = $tel.' of '.$observ if $tel && $observ ;
+  $observ = ' in '.$observ if $observ && !$tel ;
+
+  print {$output} <<EOB;
+------ Initialize PhotoRun
+
+INSERT INTO photorun VALUES (DEFAULT,'$objname$dateobs$program$author$observ') ;
+
+EOB
+};
+
+
 
 
 
@@ -206,24 +261,39 @@ print {$output} <<EOB;
 
 ------ Photometry Table
 CREATE TEMPORARY TABLE import_table (
-  "OBJ_NAME"             VarChar
-, "X_IMAGE(pixels)"      Real
-, "Y_IMAGE(pixels)"      Real
-, "RA(ALPHAWIN_J2000)"   Double Precision
-, "DEC(DELTAWIN_J2000)"  Double Precision
-, "MAG_STD_470"          Real
-, "MAGERR_STD_470"       Real
-, "MAG_STD_540"          Real
-, "MAGERR_STD_540"       Real
-, "MAG_STD_656"          Real
-, "MAGERR_STD_656"       Real
-, "470-540"              Real
-, "ERR_470-540"          Real
-, "540-656"              Real
-, "ERR_540-656"          Real
-, "470-656"              Real
-, "ERR_470-656"          Real
-, "FLAG"                 SmallInt
+  "NAME"	VarChar
+, "RA"	Double Precision
+, "DEC"	Double Precision
+, "MAG_STD_470"	Real
+, "MAGERR_STD_470"	Real
+, "MAG_STD_470_PSF"	Real
+, "MAGERR_STD_470_PSF"	Real
+, "MAG_STD_540"	Real
+, "MAGERR_STD_540"	Real
+, "MAG_STD_540_PSF"	Real
+, "MAGERR_STD_540_PSF"	Real
+, "MAG_STD_656"	Real
+, "MAGERR_STD_656"	Real
+, "MAG_STD_656_PSF"	Real
+, "MAGERR_STD_656_PSF"	Real
+, "470-540"	Real
+, "ERR_470-540"	Real
+, "470-540_PSF"	Real
+, "ERR_470-540_PSF"	Real
+, "540-656"	Real
+, "ERR_540-656"	Real
+, "540-656_PSF"	Real
+, "ERR_540-656_PSF"	Real
+, "470-656"	Real
+, "ERR_470-656"	Real
+, "470-656_PSF"	Real
+, "ERR_470-656_PSF"	Real
+, "CLASS_470"	Char
+, "CLASS_540"	Char
+, "CLASS_656"	Char
+, "FLAGS_470"	SmallInt
+, "FLAGS_540"	SmallInt
+, "FLAGS_656"	SmallInt
 ) ;
 
 COPY import_table FROM STDIN;
@@ -237,19 +307,34 @@ while (my $str=<$file>) {
 print {$output} <<'EOB';
 \.
 
-UPDATE import_table SET "MAG_STD_470"=NULL    WHERE abs("MAG_STD_470"-99.99)<=0.005 ;
-UPDATE import_table SET "MAGERR_STD_470"=NULL WHERE abs("MAGERR_STD_470"-99.99)<=0.005 ;
-UPDATE import_table SET "MAG_STD_540"=NULL    WHERE abs("MAG_STD_540"-99.99)<=0.005 ;
-UPDATE import_table SET "MAGERR_STD_540"=NULL WHERE abs("MAGERR_STD_540"-99.99)<=0.005 ;
-UPDATE import_table SET "MAG_STD_656"=NULL    WHERE abs("MAG_STD_656"-99.99)<=0.005 ;
-UPDATE import_table SET "MAGERR_STD_656"=NULL WHERE abs("MAGERR_STD_656"-99.99)<=0.005 ;
+UPDATE import_table SET "MAG_STD_470"=NULL    WHERE abs("MAG_STD_470"-99.00)<=0.005 ;
+UPDATE import_table SET "MAGERR_STD_470"=NULL WHERE abs("MAGERR_STD_470"-99.00)<=0.005 ;
+UPDATE import_table SET "MAG_STD_540"=NULL    WHERE abs("MAG_STD_540"-99.00)<=0.005 ;
+UPDATE import_table SET "MAGERR_STD_540"=NULL WHERE abs("MAGERR_STD_540"-99.00)<=0.005 ;
+UPDATE import_table SET "MAG_STD_656"=NULL    WHERE abs("MAG_STD_656"-99.00)<=0.005 ;
+UPDATE import_table SET "MAGERR_STD_656"=NULL WHERE abs("MAGERR_STD_656"-99.00)<=0.005 ;
 
-UPDATE import_table SET "470-540"=NULL        WHERE abs("470-540"-99.99)<=0.005 ;
-UPDATE import_table SET "ERR_470-540"=NULL    WHERE abs("ERR_470-540"-99.99)<=0.005 ;
-UPDATE import_table SET "540-656"=NULL        WHERE abs("540-656"-99.99)<=0.005 ;
-UPDATE import_table SET "ERR_540-656"=NULL    WHERE abs("ERR_540-656"-99.99)<=0.005 ;
-UPDATE import_table SET "470-656"=NULL        WHERE abs("470-656"-99.99)<=0.005 ;
-UPDATE import_table SET "ERR_470-656"=NULL    WHERE abs("ERR_470-656"-99.99)<=0.005 ;
+UPDATE import_table SET "MAG_STD_470_PSF"=NULL    WHERE abs("MAG_STD_470_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "MAGERR_STD_470_PSF"=NULL WHERE abs("MAGERR_STD_470_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "MAG_STD_540_PSF"=NULL    WHERE abs("MAG_STD_540_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "MAGERR_STD_540_PSF"=NULL WHERE abs("MAGERR_STD_540_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "MAG_STD_656_PSF"=NULL    WHERE abs("MAG_STD_656_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "MAGERR_STD_656_PSF"=NULL WHERE abs("MAGERR_STD_656_PSF"-99.00)<=0.005 ;
+
+
+UPDATE import_table SET "470-540"=NULL        WHERE abs("470-540"-99.00)<=0.005 ;
+UPDATE import_table SET "ERR_470-540"=NULL    WHERE abs("ERR_470-540"-99.00)<=0.005 ;
+UPDATE import_table SET "540-656"=NULL        WHERE abs("540-656"-99.00)<=0.005 ;
+UPDATE import_table SET "ERR_540-656"=NULL    WHERE abs("ERR_540-656"-99.00)<=0.005 ;
+UPDATE import_table SET "470-656"=NULL        WHERE abs("470-656"-99.00)<=0.005 ;
+UPDATE import_table SET "ERR_470-656"=NULL    WHERE abs("ERR_470-656"-99.00)<=0.005 ;
+
+UPDATE import_table SET "470-540_PSF"=NULL        WHERE abs("470-540_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "ERR_470-540_PSF"=NULL    WHERE abs("ERR_470-540_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "540-656_PSF"=NULL        WHERE abs("540-656_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "ERR_540-656_PSF"=NULL    WHERE abs("ERR_540-656_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "470-656_PSF"=NULL        WHERE abs("470-656_PSF"-99.00)<=0.005 ;
+UPDATE import_table SET "ERR_470-656_PSF"=NULL    WHERE abs("ERR_470-656_PSF"-99.00)<=0.005 ;
 
 EOB
 
@@ -265,27 +350,116 @@ print {$output} <<EOB;
 
 ------ Insert data into DB
 
-INSERT INTO photorun VALUES (DEFAULT,NULL) ;
 INSERT INTO runset VALUES 
   ( (SELECT max(runid) FROM photorun) , '$fits470' )
 , ( (SELECT max(runid) FROM photorun) , '$fits540' )
 , ( (SELECT max(runid) FROM photorun) , '$fits656' )
 ;
 
-INSERT INTO photoobj (runid,frameid,runobjid,x,y,ra,dec,mag,e_mag,quality)
-SELECT (SELECT max(runid) FROM photorun) , '$fits470' , "OBJ_NAME" , "X_IMAGE(pixels)" , "Y_IMAGE(pixels)" , "RA(ALPHAWIN_J2000)" , "DEC(DELTAWIN_J2000)" , "MAG_STD_470" , "MAGERR_STD_470" , "FLAG" 
-FROM import_table 
-WHERE "MAG_STD_470" IS NOT NULL ;
+INSERT INTO photoobj (runId, frameId, runObjId, ra, dec, mag, e_mag, type, class, quality)
+SELECT 
+  (SELECT max(runid) FROM photorun)
+, '$fits470' 
+, "NAME" 
+, "RA" 
+, "DEC" 
+, "MAG_STD_470" 
+, "MAGERR_STD_470" 
+, 'STD'
+, "CLASS_470"
+, "FLAGS_470"
+FROM import_table
+WHERE 
+  "MAG_STD_470" IS NOT NULL 
+;
 
-INSERT INTO photoobj (runid,frameid,runobjid,x,y,ra,dec,mag,e_mag,quality)
-SELECT (SELECT max(runid) FROM photorun) , '$fits540' , "OBJ_NAME" , "X_IMAGE(pixels)" , "Y_IMAGE(pixels)" , "RA(ALPHAWIN_J2000)" , "DEC(DELTAWIN_J2000)" , "MAG_STD_540" , "MAGERR_STD_540" , "FLAG" 
-FROM import_table 
-WHERE "MAG_STD_540" IS NOT NULL ;
+INSERT INTO photoobj (runId, frameId, runObjId, ra, dec, mag, e_mag, type, class, quality)
+SELECT 
+  (SELECT max(runid) FROM photorun)
+, '$fits470' 
+, "NAME" 
+, "RA" 
+, "DEC" 
+, "MAG_STD_470_PSF" 
+, "MAGERR_STD_470_PSF" 
+, 'PSF'
+, "CLASS_470"
+, "FLAGS_470"
+FROM import_table
+WHERE 
+  "MAG_STD_470_PSF" IS NOT NULL 
+;
 
-INSERT INTO photoobj (runid,frameid,runobjid,x,y,ra,dec,mag,e_mag,quality)
-SELECT (SELECT max(runid) FROM photorun) , '$fits656' , "OBJ_NAME" , "X_IMAGE(pixels)" , "Y_IMAGE(pixels)" , "RA(ALPHAWIN_J2000)" , "DEC(DELTAWIN_J2000)" , "MAG_STD_656" , "MAGERR_STD_656" , "FLAG" 
-FROM import_table 
-WHERE "MAG_STD_656" IS NOT NULL ;
+
+INSERT INTO photoobj (runId, frameId, runObjId, ra, dec, mag, e_mag, type, class, quality)
+SELECT 
+  (SELECT max(runid) FROM photorun)
+, '$fits540' 
+, "NAME" 
+, "RA" 
+, "DEC" 
+, "MAG_STD_540" 
+, "MAGERR_STD_540" 
+, 'STD'
+, "CLASS_540"
+, "FLAGS_540"
+FROM import_table
+WHERE 
+  "MAG_STD_540" IS NOT NULL 
+;
+
+INSERT INTO photoobj (runId, frameId, runObjId, ra, dec, mag, e_mag, type, class, quality)
+SELECT 
+  (SELECT max(runid) FROM photorun)
+, '$fits540' 
+, "NAME" 
+, "RA" 
+, "DEC" 
+, "MAG_STD_540_PSF" 
+, "MAGERR_STD_540_PSF" 
+, 'PSF'
+, "CLASS_540"
+, "FLAGS_540"
+FROM import_table
+WHERE 
+  "MAG_STD_540_PSF" IS NOT NULL 
+;
+
+
+INSERT INTO photoobj (runId, frameId, runObjId, ra, dec, mag, e_mag, type, class, quality)
+SELECT 
+  (SELECT max(runid) FROM photorun)
+, '$fits656' 
+, "NAME" 
+, "RA" 
+, "DEC" 
+, "MAG_STD_656" 
+, "MAGERR_STD_656" 
+, 'STD'
+, "CLASS_656"
+, "FLAGS_656"
+FROM import_table
+WHERE 
+  "MAG_STD_656" IS NOT NULL 
+;
+
+INSERT INTO photoobj (runId, frameId, runObjId, ra, dec, mag, e_mag, type, class, quality)
+SELECT 
+  (SELECT max(runid) FROM photorun)
+, '$fits656' 
+, "NAME" 
+, "RA" 
+, "DEC" 
+, "MAG_STD_656_PSF" 
+, "MAGERR_STD_656_PSF" 
+, 'PSF'
+, "CLASS_656"
+, "FLAGS_656"
+FROM import_table
+WHERE 
+  "MAG_STD_656_PSF" IS NOT NULL 
+;
+
 
 EOB
 };
