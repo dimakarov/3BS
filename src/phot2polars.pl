@@ -19,6 +19,9 @@ our $empty = 99.00000 ;
 # FITS file
 our $fitsprefix = '../fits/' ;
 
+# Debug section
+our $debug = 0 ;
+
 
 GetOptions( 
 'help|?' => \$help,
@@ -28,12 +31,14 @@ GetOptions(
 'delimiter=s' => \$delimiter,
 'empty=s' => \$empty,
 'fitsprefix=s' => \$fitsprefix,
+'debug!' => \$debug,
 ) || pod2usage( -verbose => 0, -exitval => 2 ) ;
 
 pod2usage( -verbose => 1, -exitval => 0 )       if $help ;
 pod2usage( -verbose => 2, -exitval => 0 )       if $man ;
 
 
+print "======= Debug mode =========\n"   if $debug ;
 
 my ($filename) = @ARGV ;
 
@@ -183,9 +188,14 @@ sub WriteFITSInfo{
   my $fits = shift ;
   my $header = shift ;
 
+
   (my $dateobs) = ($header =~ /DATE-OBS= *' *([^']+) *'*?/ );
-  (my $band) = ($header =~ /FILTER *= *(\d+)/ );
+
+  (my $band) = ($header =~ /FILTER *= *'? *(\d+)/ ) ;
+  die 'Can not extract a band name from a header:'.join('',($header =~ /^(FILTER.*)$/))."\n"  if !$band ;
   $band='SED'.$band ;
+  die "Unknown filter: $band\n"  if $band !~ /^SED(470|540|656)$/ ;
+
   (my $exptime) = ($header =~ /EXPTIME *= *(\d+(\.\d+)?)/ );
   (my $mjd) = ($header =~ /MJD *= *(\d+(\.\d+)?)/ );
   (my $ra)  = ($header =~ /RA *= *(\d+(\.\d+)?)/ );
@@ -365,7 +375,7 @@ SELECT
 , "DEC" 
 , "MAG_STD_470" 
 , "MAGERR_STD_470" 
-, 'STD'
+, 'BST'
 , "CLASS_470"
 , "FLAGS_470"
 FROM import_table
@@ -400,7 +410,7 @@ SELECT
 , "DEC" 
 , "MAG_STD_540" 
 , "MAGERR_STD_540" 
-, 'STD'
+, 'BST'
 , "CLASS_540"
 , "FLAGS_540"
 FROM import_table
@@ -435,7 +445,7 @@ SELECT
 , "DEC" 
 , "MAG_STD_656" 
 , "MAGERR_STD_656" 
-, 'STD'
+, 'BST'
 , "CLASS_656"
 , "FLAGS_656"
 FROM import_table

@@ -61,7 +61,7 @@ GRANT SELECT ON magtype TO PUBLIC ;
 
 INSERT INTO magtype(type,description) VALUES
   ('PSF','PSF photometry')
-, ('STD','Standard SExtractor')
+, ('BST','SExtractor''s MAG_BEST aperture magnitude')
 ;
 
 
@@ -100,8 +100,8 @@ COMMENT ON COLUMN photoobj.ra       IS 'RA of the object (deg) (from the photome
 COMMENT ON COLUMN photoobj.dec      IS 'Dec of the object (deg) (from the photometry table)' ;
 COMMENT ON COLUMN photoobj.mag      IS 'Magnitude (from the photometry table)' ;
 COMMENT ON COLUMN photoobj.e_mag    IS 'Magnitude error (from the photometry table)' ;
-COMMENT ON COLUMN photoobj.type     IS 'Type of the photometry (STD|PSF) (from the photometry table)' ;
-COMMENT ON COLUMN photoobj.class    IS 'SExtractor flag on the object classification (S|E|U) (from the photometry table)' ;
+COMMENT ON COLUMN photoobj.type     IS 'Type of the photometry (BST|PSF) (from the photometry table)' ;
+COMMENT ON COLUMN photoobj.class    IS 'Object classification (S|E|U) based on SPREAD_MODEL (from the photometry table)' ;
 COMMENT ON COLUMN photoobj.quality  IS 'SExtractor quality flag of the photometry (from the photometry table)' ;
 
 GRANT SELECT ON photoobj TO PUBLIC ;
