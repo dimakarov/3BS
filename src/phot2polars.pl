@@ -199,7 +199,10 @@ sub WriteFITSInfo{
   (my $exptime) = ($header =~ /EXPTIME *= *(\d+(\.\d+)?)/ );
   (my $mjd) = ($header =~ /MJD *= *(\d+(\.\d+)?)/ );
   (my $ra)  = ($header =~ /RA *= *(\d+(\.\d+)?)/ );
-  (my $dec) = ($header =~ /DEC *= *(\d+(\.\d+)?)/ );
+  (my $dec) = ($header =~ /DEC *= *([+-]?\d+(\.\d+)?)/ );
+
+  die "Can not find/decode RA field in FITS-file: $fits\n"	if ! $ra ;
+  die "Can not find/decode DEC field in FITS-file: $fits\n"	if ! $dec ;
   
   
   my @list = split("\n",$header) ;
@@ -345,6 +348,31 @@ UPDATE import_table SET "540-656_PSF"=NULL        WHERE abs("540-656_PSF"-99.00)
 UPDATE import_table SET "ERR_540-656_PSF"=NULL    WHERE abs("ERR_540-656_PSF"-99.00)<=0.005 ;
 UPDATE import_table SET "470-656_PSF"=NULL        WHERE abs("470-656_PSF"-99.00)<=0.005 ;
 UPDATE import_table SET "ERR_470-656_PSF"=NULL    WHERE abs("ERR_470-656_PSF"-99.00)<=0.005 ;
+
+
+UPDATE import_table
+SET "NAME" = t."NAME"||chr(64+t.n::SmallInt)
+FROM (
+  SELECT
+    "NAME"
+  , "RA"
+  , "DEC"
+  , row_number() OVER (PARTITION BY "NAME" ORDER BY "NAME","RA","DEC") AS n
+  FROM import_table
+  WHERE "NAME" IN (
+  SELECT "NAME"
+  FROM import_table
+  GROUP BY "NAME"
+  HAVING count(*)>1
+  )
+  ORDER BY "NAME","RA","DEC"
+) AS t
+WHERE
+  import_table."NAME"=t."NAME"
+  and import_table."RA"=t."RA"
+  and import_table."DEC"=t."DEC"
+;
+
 
 EOB
 
